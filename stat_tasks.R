@@ -179,10 +179,8 @@ library(dplyr)
 max_resid <- function(x){
   stat <- sapply(x, function(y) chisq.test(table(y))$stdres)
   stat_vec <- unlist(stat)
-  #x <- dimnames(stat_vec)
   col_n <- colnames(table(x))[which(stat_vec == max(stat_vec))]
   row_n <- rownames(table(x))[which(stat_vec == max(stat_vec))]
-  #rownames(table(x))[which(stat_vec == max(stat_vec), arr.ind = T)]
   c(row_n, col_n)
 }
 
@@ -207,11 +205,192 @@ library(ggplot2)
 data("diamonds")
 
 #разбиение бара на подбары: position = 'dodge'
+
 obj <- ggplot(diamonds, aes(color, fill = factor(cut))) +
   geom_bar(position = 'dodge')
-# не выводите график на печать
 
 
 
 
-         
+# logistic regression
+
+
+# Task 1.
+# Write a get_coefficients function that receives input 
+# to a dataframe with two variables x (a factor with two variable gradations) 
+# and y (a factor with two gradations). The function builds a logistic model,
+# where y is the dependent variable and x is the independent variable, 
+# and returns a vector with the values of the model's coefficients.
+
+test_data <- read.csv("https://stepik.org/media/attachments/course/524/test_data_01.csv")
+
+test_data <- transform(test_data, x = factor(x), y = factor(y))
+
+
+get_coefficients <- function(dataset){
+  model <- glm(y ~ x, dataset, family = 'binomial')
+  return(exp(coef(model)))
+  
+}
+
+get_coefficients(test_data)
+
+# Task 2
+# write a centered function that takes as input a dataframe and variable
+# names that need to be centered as described above. The function must 
+# return the same dataframe, only with the specified variables centered.
+
+library(dplyr)
+
+test_data_1 <- read.csv("https://stepic.org/media/attachments/course/524/cen_data.csv")
+
+var_names = c("X4", "X2", "X1")
+
+
+centered <- function(test_data, var_names){
+  result <- mutate_at(test_data, var_names, function(x){
+    x - mean(x)
+  })
+  return(result)
+  
+}
+
+centered(test_data_1, var_names)
+
+
+# Task 3
+# Write a get_features function that takes a baggage data set as input.
+# Builds a logistic regression where dependent variable is whether baggage 
+# was forbidden and predictors are other variables and returns a vector 
+# with names of statistically significant variables (p < 0.05) 
+# (in a model without interaction). If there are no significant predictors 
+# in the data, the function returns a string with the message 
+# "Prediction makes no sense".
+
+get_features <- function(dataset){
+  fit <- glm(is_prohibited ~ ., dataset, family = "binomial")
+  result <- anova(fit, test = "Chisq")["Pr(>Chi)"]
+  p.v <<- result < 0.05
+  if (all(p.v == F, na.rm = T)){
+    print("Prediction makes no sense")
+    
+  } else {
+    
+    return(colnames(dataset)[p.v])
+  }
+
+}
+
+class(p.v)
+
+data_get_feat <- read.csv("https://stepic.org/media/attachments/course/524/test_luggage_1.csv", 
+                          stringsAsFactors = T)
+str(data_get_feat)
+get_features(data_get_feat)
+
+
+data_get_feat_1 <- read.csv("https://stepic.org/media/attachments/course/524/test_luggage_2.csv",
+                        stringsAsFactors = T)
+#str(data_get_feat_1)
+get_features(data_get_feat_1)
+
+
+# Task 4
+# Write a function that takes two sets of data as input. The first dataframe,
+# as in the previous task, contains information about the baggage already 
+# inspected (prohibited or not, weight, length, width, type of bag).
+
+# The second set of data is information about new baggage that is being 
+# scanned right now. The data also contains information: weight, length, 
+# width, type of bag and passenger's name (see the description of the 
+# variables in the example).
+
+# In total, your function takes two sets of data and returns the name of 
+# the passenger with the most suspicious baggage. If multiple passengers 
+# received the maximum probability value, then return a vector with 
+# multiple names.
+
+train <- read.csv("https://stepic.org/media/attachments/course/524/test_data_passangers.csv",
+                      stringsAsFactors = T)
+str(train)
+
+data_for_predict <-read.csv("https://stepic.org/media/attachments/course/524/predict_passangers.csv",
+                            stringsAsFactors = T)
+str(data_for_predict)
+
+most_suspicious <- function(test_data, data_for_predict){
+  fit <- glm(is_prohibited ~ ., test_data, family = "binomial")
+  new_data <- predict(fit, newdata = data_for_predict, type="response")
+  ind <- which(new_data == max(new_data))
+  return(data_for_predict$passangers[ind])
+  
+}
+
+most_suspicious(train, data_for_predict)
+
+
+# Task 5
+# Write a normality_test function that receives a dataframe with an
+# arbitrary number of variables of different types (quantitative, strings, 
+# factors) as input and checks the normality of the distribution of 
+# quantitative variables. The function must return a vector of p-significance 
+# values for the shapiro.test test for each scale variable.
+
+data("iris")
+test <- read.csv("https://stepic.org/media/attachments/course/524/test.csv")
+
+normality_test <- function(dataset){
+  x <- dataset[sapply(dataset, is.numeric)]
+  test <- sapply(x, function(var){ shapiro.test(var)$p.value })
+  return(test)
+  
+}
+
+
+normality_test(iris)
+normality_test(test)
+
+
+
+# Task 6
+# Write a smart_anova function that takes a dataframe with two variables 
+# x and y as input. Variable x is a quantitative variable, variable y is a 
+# factor, divides the observations into three groups.
+
+# If the distributions in all groups are not significantly different from 
+# normal, and the variances in the groups are homogeneous, the function 
+# should compare the three groups using analysis of variance and return a 
+# named vector with p-value, element name is "ANOVA".
+
+# If at least in one group the distribution is significantly different 
+# from normal or the variances are not homogeneous, the function compares 
+# the groups using the Kruskal-Wallis test and returns a named vector with 
+# a p-value, the vector name is "KW".
+
+# The distribution will be considered significantly deviated from the 
+# normal if p < 0.05 in the shapiro.test() test.
+
+# Dispersions will be considered non-homogeneous if p < 0.05 in the
+# bartlett.test() test.
+
+smart_test <- read.csv("https://stepic.org/media/attachments/course/524/s_anova_test.csv",
+                       stringsAsFactors = F)
+
+
+smart_anova <- function(test_data){
+  norm_test <<- aggregate(x ~ y, test_data, function(x){shapiro.test(x)$p.value})
+  homogeneous <<- bartlett.test(x ~ y, test_data)$p.value
+  if ( all(norm_test > 0.05) & homogeneous > 0.05){
+    fit <- aov(x ~ y, test_data)
+    #p_value <- summary(fit)[[1]]$'Pr(>F)'[1]
+    anov <- c(ANOVA = summary(fit)[[1]]$'Pr(>F)'[1])
+    return(anov)
+  } else {
+    kw <- c(KW = kruskal.test(x ~ y, test_data)$p.value)
+    return(kw)
+  }
+  
+}
+
+
+smart_anova(smart_test)
